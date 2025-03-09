@@ -1,12 +1,6 @@
-from flask import Flask, render_template, Response, url_for
-from ask_sdk_core.skill_builder import SkillBuilder
-from ask_sdk_core.dispatch_components import AbstractRequestHandler
-from ask_sdk_core.utils import is_request_type, is_intent_name
-from flask_ask_sdk.skill_adapter import SkillAdapter
-from ask_sdk_model import Response as AskResponse
+from flask import Flask, request, jsonify, render_template, Response, url_for
 import cv2
 import os
-
 
 app = Flask(__name__)
 
@@ -21,70 +15,79 @@ cameras_info = {
 }
 
 # ----------------------
-# Alexa Skill Setup
+# Alexa Webhook Endpoint
 # ----------------------
-sb = SkillBuilder()
-
-class LaunchRequestHandler(AbstractRequestHandler):
-    def can_handle(self, handler_input):
-        return is_request_type("LaunchRequest")(handler_input)
-    def handle(self, handler_input):
-        speech_text = ("Welcome to your Alexa Camera Control. "
-                       "Say something like 'show camera1' or 'remove all' to control your cameras.")
-        return handler_input.response_builder.speak(speech_text).set_should_end_session(False).response
-
-class ShowCameraIntentHandler(AbstractRequestHandler):
-    def can_handle(self, handler_input):
-        return is_intent_name("ShowCameraIntent")(handler_input)
-    def handle(self, handler_input):
-        global active_cameras
-        slots = handler_input.request_envelope.request.intent.slots
-        camera_slot = slots.get("CameraName")
-        if camera_slot and camera_slot.value:
-            camera = camera_slot.value.lower()
-            if camera == "all":
-                active_cameras = list(cameras_info.keys())
-                speech_text = "Displaying all cameras."
-            else:
-                if camera in cameras_info:
-                    if camera not in active_cameras:
-                        active_cameras.append(camera)
-                    speech_text = f"Displaying {camera}."
+@app.route('/alexa', methods=['POST'])
+def alexa_webhook():
+    req = request.get_json()
+    if not req or 'request' not in req:
+        return build_response("Invalid Request", True)
+    
+    req_type = req['request'].get('type')
+    
+    if req_type == "LaunchRequest":
+        return build_response("Welcome to your Alexa Camera Control. Say something like 'show camera1' or 'remove all' to control your cameras.", False)
+    
+    elif req_type == "IntentRequest":
+        intent = req['request'].get('intent', {})
+        intent_name = intent.get('name', "")
+        slots = intent.get('slots', {})
+        
+        # Handle "ShowCameraIntent"
+        if intent_name == "ShowCameraIntent":
+            camera_slot = slots.get("CameraName", {})
+            camera_value = camera_slot.get("value", "").lower()
+            if camera_value:
+                if camera_value == "all":
+                    active_cameras[:] = list(cameras_info.keys())
+                    speech_text = "Displaying all cameras."
                 else:
-                    speech_text = f"I don't recognize {camera}."
-        else:
-            speech_text = "I didn't catch which camera to display."
-        return handler_input.response_builder.speak(speech_text).set_should_end_session(True).response
-
-class RemoveCameraIntentHandler(AbstractRequestHandler):
-    def can_handle(self, handler_input):
-        return is_intent_name("RemoveCameraIntent")(handler_input)
-    def handle(self, handler_input):
-        global active_cameras
-        slots = handler_input.request_envelope.request.intent.slots
-        camera_slot = slots.get("CameraName")
-        if camera_slot and camera_slot.value:
-            camera = camera_slot.value.lower()
-            if camera == "all":
-                active_cameras = []
-                speech_text = "Removed all cameras."
+                    if camera_value in cameras_info:
+                        if camera_value not in active_cameras:
+                            active_cameras.append(camera_value)
+                        speech_text = f"Displaying {camera_value}."
+                    else:
+                        speech_text = f"I don't recognize {camera_value}."
             else:
-                if camera in active_cameras:
-                    active_cameras.remove(camera)
-                    speech_text = f"Removed {camera} from display."
+                speech_text = "I didn't catch which camera to display."
+            return build_response(speech_text, True)
+        
+        # Handle "RemoveCameraIntent"
+        elif intent_name == "RemoveCameraIntent":
+            camera_slot = slots.get("CameraName", {})
+            camera_value = camera_slot.get("value", "").lower()
+            if camera_value:
+                if camera_value == "all":
+                    active_cameras.clear()
+                    speech_text = "Removed all cameras."
                 else:
-                    speech_text = f"{camera} is not currently displayed."
+                    if camera_value in active_cameras:
+                        active_cameras.remove(camera_value)
+                        speech_text = f"Removed {camera_value} from display."
+                    else:
+                        speech_text = f"{camera_value} is not currently displayed."
+            else:
+                speech_text = "I didn't catch which camera to remove."
+            return build_response(speech_text, True)
+        
         else:
-            speech_text = "I didn't catch which camera to remove."
-        return handler_input.response_builder.speak(speech_text).set_should_end_session(True).response
+            return build_response("I'm not sure how to help with that.", True)
+    
+    else:
+        return build_response("Invalid Request Type", True)
 
-# Register Alexa handlers
-sb.add_request_handler(LaunchRequestHandler())
-sb.add_request_handler(ShowCameraIntentHandler())
-sb.add_request_handler(RemoveCameraIntentHandler())
-
-# Create the Alexa skill adapter for Flask
-skill_adapter = SkillAdapter(skill=sb.create(), skill_id="amzn1.ask.skill.bc788426-894f-4e91-bdfe-e0b2102df4e5", app=app)
+def build_response(text, should_end_session):
+    response = {
+        "version": "1.0",
+        "response": {
+            "outputSpeech": {
+                "type": "PlainText",
+                "text": text
+            },
+            "shouldEndSession": should_end_session
+        }
+    }
+    return jsonify(response)
 
 # ----------------------
 # OpenCV Streaming Setup
