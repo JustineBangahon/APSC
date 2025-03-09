@@ -1,2 +1,0 @@
-libssl-dev
-libffi-dev
