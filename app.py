@@ -7,6 +7,7 @@ from ask_sdk_model import Response as AskResponse
 import cv2
 import os
 
+os.environ["OSCRYPTO_NO_LIBCRYPTO_VERSION_CHECK"] = "true"
 app = Flask(__name__)
 
 # Global variable to store which cameras are active
