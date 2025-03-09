@@ -8,6 +8,5 @@ ask-sdk-model==1.82.0
 ask-sdk-runtime==1.19.0
 ask-sdk-webservice-support==1.3.3
 numpy==2.2.3
-oscrypto==1.3.0
-cryptography==3.3.2
+
 
