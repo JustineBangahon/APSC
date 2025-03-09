@@ -5,7 +5,7 @@ from ask_sdk_core.utils import is_request_type, is_intent_name
 from flask_ask_sdk.skill_adapter import SkillAdapter
 from ask_sdk_model import Response as AskResponse
 import cv2
-
+import os
 
 
 app = Flask(__name__)
@@ -119,5 +119,5 @@ def video_feed(camera_name):
         return "Camera not found", 404
 
 if __name__ == '__main__':
-
-    app.run(debug=False, host='0.0.0.0', port=10000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
