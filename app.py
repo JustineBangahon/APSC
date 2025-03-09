@@ -6,8 +6,9 @@ from flask_ask_sdk.skill_adapter import SkillAdapter
 from ask_sdk_model import Response as AskResponse
 import cv2
 import os
-
 os.environ["OSCRYPTO_NO_LIBCRYPTO_VERSION_CHECK"] = "true"
+os.environ["OSCRYPTO_LIBCRYPTO_PATH"] = "/usr/lib/x86_64-linux-gnu/libcrypto.so.3"
+
 app = Flask(__name__)
 
 # Global variable to store which cameras are active
